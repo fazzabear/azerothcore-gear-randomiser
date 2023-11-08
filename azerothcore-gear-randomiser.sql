@@ -19,13 +19,10 @@ or itemlevel >199)
 and name not like '%gladiator%'
 ;
 
--- Creates a table of 1-50, or however many iterations you'd like
 create table iterations as
 WITH RECURSIVE seq AS (SELECT 0 AS value UNION ALL SELECT value + 1 FROM seq LIMIT 50)
    SELECT * FROM seq;
 
--- Creates a table containing 50 versions of variable_loot_base
--- includes a number to act as the entry that doesn't already exist in item_template
 create table variable_loot as
 select 
 value
@@ -48,7 +45,9 @@ drop column entry;
 alter table variable_loot
 rename column new_entry to entry;
 
+
 -- Modify the variables of interest
+
 -- I've chosen to multiply each variable by a random number from 0.9-1.3
 -- For each possible gem slot that the item doesn't already use, 20% chance of a socket
 
@@ -73,15 +72,60 @@ socketColor_2 = case when (socketColor_2 > 0 or rand() > 0.2) then socketColor_2
 socketColor_3 = case when (socketColor_3 > 0 or rand() > 0.2) then socketColor_3 else 2 end  -- red
 ;
 
--- Once I've developed a list of appropriate effects, intention is to give each proc slot 
--- Something like the below, untested, just for notes
+-- Optionally, for each possible spell effect that a weapon item doesn't already use, 10% chance of a random spell effect from a defined table created from proc_spell.csv
+-- This is a big shift in weapon dynamics, so if it's not desired, skip through to inserting variable_loot to item_template
+-- spelltrigger value 2 = the effect in spellid field will have a PPM chance to activate on hit
+-- Flagging this way so as to not interfere with existing effects
 update variable_loot
 set 
-spellid_1 = case when (spellid_1 = 0) then (SELECT spellid FROM table_name ORDER BY RAND() LIMIT 1) else spellid_1 end),
-spelltrigger_1 = case when (spellid_1 = 0) then 2 else spelltrigger_1 end),
-spellppmrate_2 = case when (spellid_1 = 0) then (RAND()*(3-1)) else spellppmrate_2 end),
+spelltrigger_1 = case when (spellid_1 = 0 and rand() >0.9) then 2 else spelltrigger_1 end, -- if there is no spellid, 20% chance of flagging the trigger slot to get one
+spelltrigger_2 = case when (spellid_2 = 0 and rand() >0.9) then 2 else spelltrigger_2 end, 
+spelltrigger_3 = case when (spellid_3 = 0 and rand() >0.9) then 2 else spelltrigger_3 end, 
+spelltrigger_4 = case when (spellid_4 = 0 and rand() >0.9) then 2 else spelltrigger_4 end, 
+spelltrigger_5 = case when (spellid_5 = 0 and rand() >0.9) then 2 else spelltrigger_5 end 
+where class = 2
+;
 
-where -- appropriate randomization
+-- if the trigger slot has been flagged but no PPM value exists and no spellid, set PPM to 99 as a placeholder
+-- ordering this way so as to not interfere with the non-PPM chance on hit effects that exist (e.g. rusted gutgore ripper)
+-- also set spellcooldown to 100ms to avoid using default spell cooldowns. This may also block procs from procs, which is probably for the best
+
+update variable_loot
+set 
+spellppmRate_1 = case when (spellid_1 = 0 and spelltrigger_1 = 2) then 99 else spellppmRate_1 end,
+spellppmRate_2 = case when (spellid_2 = 0 and spelltrigger_2 = 2) then 99 else spellppmRate_2 end,
+spellppmRate_3 = case when (spellid_3 = 0 and spelltrigger_3 = 2) then 99 else spellppmRate_3 end,
+spellppmRate_4 = case when (spellid_4 = 0 and spelltrigger_4 = 2) then 99 else spellppmRate_4 end,
+spellppmRate_5 = case when (spellid_5 = 0 and spelltrigger_5 = 2) then 99 else spellppmRate_5 end,
+spellcooldown_1 = case when (spellid_1 = 0 and spelltrigger_1 = 2) then 100 else 0 end,
+spellcooldown_2 = case when (spellid_2 = 0 and spelltrigger_2 = 2) then 100 else 0 end,
+spellcooldown_3 = case when (spellid_3 = 0 and spelltrigger_3 = 2) then 100 else 0 end,
+spellcooldown_4 = case when (spellid_4 = 0 and spelltrigger_4 = 2) then 100 else 0 end,
+spellcooldown_5 = case when (spellid_5 = 0 and spelltrigger_5 = 2) then 100 else 0 end
+where class = 2
+;
+
+-- If the trigger slot has been flagged but no effect already exists, set the spellid field to a random spell from proc_spell
+update variable_loot
+set 
+spellid_1 = case when (spellid_1 = 0 and spelltrigger_1 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_1 end,
+spellid_2 = case when (spellid_2 = 0 and spelltrigger_2 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_2 end,
+spellid_3 = case when (spellid_3 = 0 and spelltrigger_3 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_3 end,
+spellid_4 = case when (spellid_4 = 0 and spelltrigger_4 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_4 end,
+spellid_5 = case when (spellid_5 = 0 and spelltrigger_5 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_5 end
+where class = 2
+;
+
+-- set the actual PPM value to a random value between 1 and 3, divided by the power of the effect as per proc_spell
+update variable_loot
+set 
+spellppmRate_1 = case when spellppmRate_1 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_1)) else 0 end,
+spellppmRate_2 = case when spellppmRate_2 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_2)) else 0 end,
+spellppmRate_3 = case when spellppmRate_3 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_3)) else 0 end,
+spellppmRate_4 = case when spellppmRate_4 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_4)) else 0 end,
+spellppmRate_5 = case when spellppmRate_5 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_5)) else 0 end
+where class = 2
+;
 
 -- Add these new items to item_template
 insert into item_template

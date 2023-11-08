@@ -1,0 +1,87 @@
+﻿name,spell_id,power
+Sweeping Strikes,12328,4
+Cleave,47520,2
+Bloodthirst,23881,2
+Holy Nova,48078,1
+Exorcism,48801,2
+Devouring Plague,48300,1
+Flame Shock,49233,2
+Battle Shout,47436,1
+Curse of Tongues,11719,1
+Evasion,26669,3
+Inner Fire,48168,2
+Consecration,48819,2
+Cone of Cold,42931,2
+Lightning Shield,10431,1
+Chain Lightning,49271,3
+Divine Storm,53385,4
+Feral Spirit,51533,5
+Bladestorm,46924,5
+Anti-Magic Zone,51052,3
+Arcane Barrage,44781,2
+Blade Flurry,13877,4
+Earth Shield,49284,3
+Blast Wave,42945,4
+Dragon's Breath,42949,3
+Devastate,47498,3
+Concussion Blow,12809,4
+Ice Barrier,43039,3
+Corpse Explosion,49158,3
+War Stomp,20549,4
+Arcane Torrent,28730,4
+Nature's Grasp,53312,3
+Tiger's Fury,50213,2
+Thunder Clap,47502,3
+Chain Heal,10622,3
+Psychic Scream,10888,4
+Blood Boil,49941,2
+Horn of Winter,57623,1
+Anti-Magic Shell,48707,2
+Strangulate,47476,4
+Chains of Ice,45524,3
+Starfall,53201,5
+Wild Growth,53251,4
+Frost Trap,13809,3
+Frostfire Bolt,47610,2
+Prayer of Mending,48113,4
+Sprint,11305,2
+Hex,51514,4
+Thunderstorm,59159,4
+Magma Totem,58734,3
+Stoneclaw Totem,58582,1
+Mana Spring Totem,58773,1
+Healing Spring Totem,58756,1
+Searing Totem,58704,1
+Water Shield,57960,2
+Fire Elemental Totem,2894,4
+Totem of Wrath,57722,3
+Seed of Corruption,47836,3
+Shadowflame,61290,2
+Death Coil,47860,4
+Corruption,47812,2
+Fear,6215,3
+Hellfire,47823,2
+Summon Felguard,30146,5
+Summon Inferno,1122,5
+Summon Felhunter,691,4
+Summon Incubus,713,4
+Summon Voidwalker,697,3
+Summon Imp,688,3
+Demoralizing Shout,47437,2
+Rend,47465,2
+Shield Wall,871,4
+Whirlwind,1680,4
+Hamstring,1715,2
+Sunder Armor,7386,1
+Retaliation,20230,4
+Recklessness,1719,5
+Grow,44833,1
+Reflective Damage Shield,35159,2
+Dancing Rune Weapon,49028,4
+Summon Gargoyle,49206,5
+Bone Shield,49222,3
+Typhoon,61384,4
+Summon Water Elemental,31687,4
+Vampiric Touch,48160,3
+Killing Spree,51690,3
+Shockwave,46968,4
