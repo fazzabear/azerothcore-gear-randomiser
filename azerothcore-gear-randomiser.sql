@@ -99,7 +99,7 @@ SET GLOBAL event_scheduler = ON;
 delimiter |
 CREATE EVENT IF NOT EXISTS item_randomiser
 ON SCHEDULE EVERY 1 DAY 
-STARTS (str_to_date('09-11-2023 034500','%d-%m-%Y %h%i%s')) -- run shortly before daily restart, or specify the time
+STARTS (str_to_date('09-11-2023 034500','%d-%m-%Y %h%i%s')) -- specify the date and time for first execution - this will run at 03:45:00 on 09-11-2023
 DO
 BEGIN
 truncate table acore_world.creature_loot_template;
