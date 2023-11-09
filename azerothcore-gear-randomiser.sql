@@ -1,22 +1,36 @@
 -- create a full copy of the entries in-scope for modification
 -- This example works for TBC gear modified by azerothcore-tbc-scaled, as well as (nearly) all level 80 WOTLK gear
--- count = 7426
+
+-- Some useful queries to refresh the process. 
+-- delete from item_template where entry in(select new_entry from variable_loot_ref);
+-- drop table variable_loot;
+-- drop table variable_loot_weapons;
+-- drop table variable_loot_base;
+-- drop table variable_loot_ref;
+-- drop table variable_loot_proc;
+-- drop table variable_loot_proc_calc;
+
+
 create table variable_loot_base as
 select * from 
 acore_world.item_template
-where class in (2,4) -- weapons and armor
+where 
+(class = 4 or
+class = 2 and dmg_min1 > 5) -- weapons and armor, excluding weapons and odd outliers with little or no DPS that are used for appearance sets
 and
 (
-(
-((quality = 3 and ItemLevel = 115) or quality = 4) 
-and bonding = 1 -- BoP
-and RequiredLevel = 70
+	(((quality = 3 and ItemLevel = 115) -- heroic-level rares
+	or quality = 4) -- epics
+	and bonding = 1 -- BoP
+	and RequiredLevel = 70
+	) -- Level 70 rares and epics that BOP
+or itemlevel >199) -- WOTLK items
+			
 and name not like '%gladiator%'
 and name not like '%high warlord%'
 and name not like '%grand marshal%'
-)
-or itemlevel >199)
-and name not like '%gladiator%'
+and name not like 'Chancellor''s%' -- excluding PVP gear and a bunch of TBC items not available to players
+and RequiredReputationFaction = 0 -- exclude rep items, doing a daily vendor check to see if a rep item has rolled well sounds horrendously unfun
 ;
 
 create table iterations as
@@ -73,63 +87,145 @@ socketColor_3 = case when (socketColor_3 > 0 or rand() > 0.2) then socketColor_3
 ;
 
 -- Optionally, for each possible spell effect that a weapon item doesn't already use, 10% chance of a random spell effect from a defined table created from proc_spell.csv
--- This is a big shift in weapon dynamics, so if it's not desired, skip through to inserting variable_loot to item_template
 -- spelltrigger value 2 = the effect in spellid field will have a PPM chance to activate on hit
 -- Flagging this way so as to not interfere with existing effects
-update variable_loot
-set 
-spelltrigger_1 = case when (spellid_1 = 0 and rand() >0.9) then 2 else spelltrigger_1 end, -- if there is no spellid, 20% chance of flagging the trigger slot to get one
-spelltrigger_2 = case when (spellid_2 = 0 and rand() >0.9) then 2 else spelltrigger_2 end, 
-spelltrigger_3 = case when (spellid_3 = 0 and rand() >0.9) then 2 else spelltrigger_3 end, 
-spelltrigger_4 = case when (spellid_4 = 0 and rand() >0.9) then 2 else spelltrigger_4 end, 
-spelltrigger_5 = case when (spellid_5 = 0 and rand() >0.9) then 2 else spelltrigger_5 end 
-where class = 2
+
+-- Create a table assigning the chance of a proc existing based on weapon dps 
+
+create table variable_loot_proc_calc 
+ ( entry numeric,
+ ench_chance_invert decimal (4,4),
+ flag_1 numeric,
+ flag_2 numeric,
+ flag_3 numeric,
+ flag_4 numeric,
+ flag_5 numeric
+  );
+
+-- Assigns a chance of enchantment based on weapon dps within that subclass
+-- the highest dps weapon of each subclass will have the highest chance of an enhancement
+-- Incentivises pursuing higher level content (higher average weapon dps) for a higher chance at enhancement, rather than grinding lower level content
+-- 
+insert ignore into variable_loot_proc_calc
+select
+a.entry entry,
+1.075-((((((a.dmg_min1+a.dmg_max1)/2)/a.delay)*1000)/(b.max_dps*0.7))*0.15) ench_chance_invert,
+0 flag_1,
+0 flag_2,
+0 flag_3,
+0 flag_4,
+0 flag_5
+from variable_loot a 
+join
+(select
+subclass,
+max(((((dmg_min1+dmg_max1)/2)/delay)*1000)) max_dps 
+from variable_loot group by subclass) b on a.subclass = b.subclass
+where a.class = 2 
 ;
 
--- if the trigger slot has been flagged but no PPM value exists and no spellid, set PPM to 99 as a placeholder
--- ordering this way so as to not interfere with the non-PPM chance on hit effects that exist (e.g. rusted gutgore ripper)
--- also set spellcooldown to 100ms to avoid using default spell cooldowns. This may also block procs from procs, which is probably for the best
+-- Setting a minimum chance
+update variable_loot_proc_calc
+set ench_chance_invert = 0.975 where ench_chance_invert > 0.975;
 
-update variable_loot
+-- Setting chance of enhancement
+update variable_loot_proc_calc
 set 
-spellppmRate_1 = case when (spellid_1 = 0 and spelltrigger_1 = 2) then 99 else spellppmRate_1 end,
-spellppmRate_2 = case when (spellid_2 = 0 and spelltrigger_2 = 2) then 99 else spellppmRate_2 end,
-spellppmRate_3 = case when (spellid_3 = 0 and spelltrigger_3 = 2) then 99 else spellppmRate_3 end,
-spellppmRate_4 = case when (spellid_4 = 0 and spelltrigger_4 = 2) then 99 else spellppmRate_4 end,
-spellppmRate_5 = case when (spellid_5 = 0 and spelltrigger_5 = 2) then 99 else spellppmRate_5 end,
-spellcooldown_1 = case when (spellid_1 = 0 and spelltrigger_1 = 2) then 100 else 0 end,
-spellcooldown_2 = case when (spellid_2 = 0 and spelltrigger_2 = 2) then 100 else 0 end,
-spellcooldown_3 = case when (spellid_3 = 0 and spelltrigger_3 = 2) then 100 else 0 end,
-spellcooldown_4 = case when (spellid_4 = 0 and spelltrigger_4 = 2) then 100 else 0 end,
-spellcooldown_5 = case when (spellid_5 = 0 and spelltrigger_5 = 2) then 100 else 0 end
-where class = 2
+flag_1 = case when rand() > ench_chance_invert then 1 else 0 end,
+flag_2 = case when rand() > ench_chance_invert then 1 else 0 end,
+flag_3 = case when rand() > ench_chance_invert then 1 else 0 end,
+flag_4 = case when rand() > ench_chance_invert then 1 else 0 end,
+flag_5 = case when rand() > ench_chance_invert then 1 else 0 end
 ;
 
--- If the trigger slot has been flagged but no effect already exists, set the spellid field to a random spell from proc_spell
-update variable_loot
-set 
-spellid_1 = case when (spellid_1 = 0 and spelltrigger_1 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_1 end,
-spellid_2 = case when (spellid_2 = 0 and spelltrigger_2 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_2 end,
-spellid_3 = case when (spellid_3 = 0 and spelltrigger_3 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_3 end,
-spellid_4 = case when (spellid_4 = 0 and spelltrigger_4 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_4 end,
-spellid_5 = case when (spellid_5 = 0 and spelltrigger_5 = 2) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else spellid_5 end
-where class = 2
+-- Create a table of all the spell variables without overwriting existing variables
+-- uses a placeholder (99) for PPM
+create table variable_loot_proc as
+select 
+a.entry,
+case when (a.spellid_1 = 0 and b.flag_1 = 1) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else a.spellid_1 end spellid_1,
+case when (a.spellid_2 = 0 and b.flag_2 = 1) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else a.spellid_2 end spellid_2,
+case when (a.spellid_3 = 0 and b.flag_3 = 1) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else a.spellid_3 end spellid_3,
+case when (a.spellid_4 = 0 and b.flag_4 = 1) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else a.spellid_4 end spellid_4,
+case when (a.spellid_5 = 0 and b.flag_5 = 1) then (SELECT spell_id FROM proc_spell ORDER BY RAND() LIMIT 1) else a.spellid_5 end spellid_5,
+
+case when (a.spellid_1 = 0 and b.flag_1 = 1) then 2 else a.spelltrigger_1 end spelltrigger_1,
+case when (a.spellid_2 = 0 and b.flag_2 = 1) then 2 else a.spelltrigger_2 end spelltrigger_2,
+case when (a.spellid_3 = 0 and b.flag_3 = 1) then 2 else a.spelltrigger_3 end spelltrigger_3,
+case when (a.spellid_4 = 0 and b.flag_4 = 1) then 2 else a.spelltrigger_4 end spelltrigger_4,
+case when (a.spellid_5 = 0 and b.flag_5 = 1) then 2 else a.spelltrigger_5 end spelltrigger_5,
+
+case when (a.spellid_1 = 0 and b.flag_1 = 1) then 99 else a.spellppmrate_1 end spellppmrate_1,
+case when (a.spellid_2 = 0 and b.flag_2 = 1) then 99 else a.spellppmrate_2 end spellppmrate_2,
+case when (a.spellid_3 = 0 and b.flag_3 = 1) then 99 else a.spellppmrate_3 end spellppmrate_3,
+case when (a.spellid_4 = 0 and b.flag_4 = 1) then 99 else a.spellppmrate_4 end spellppmrate_4,
+case when (a.spellid_5 = 0 and b.flag_5 = 1) then 99 else a.spellppmrate_5 end spellppmrate_5,
+
+case when (a.spellid_1 = 0 and b.flag_1 = 1) then 100 else a.spellcooldown_1 end spellcooldown_1,
+case when (a.spellid_2 = 0 and b.flag_2 = 1) then 100 else a.spellcooldown_2 end spellcooldown_2,
+case when (a.spellid_3 = 0 and b.flag_3 = 1) then 100 else a.spellcooldown_3 end spellcooldown_3,
+case when (a.spellid_4 = 0 and b.flag_4 = 1) then 100 else a.spellcooldown_4 end spellcooldown_4,
+case when (a.spellid_5 = 0 and b.flag_5 = 1) then 100 else a.spellcooldown_5 end spellcooldown_5
+
+from variable_loot a join variable_loot_proc_calc b on a.entry = b.entry
+where a.class = 2
 ;
 
 -- set the actual PPM value to a random value between 1 and 3, divided by the power of the effect as per proc_spell
-update variable_loot
+update variable_loot_proc
 set 
-spellppmRate_1 = case when spellppmRate_1 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_1)) else 0 end,
-spellppmRate_2 = case when spellppmRate_2 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_2)) else 0 end,
-spellppmRate_3 = case when spellppmRate_3 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_3)) else 0 end,
-spellppmRate_4 = case when spellppmRate_4 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_4)) else 0 end,
-spellppmRate_5 = case when spellppmRate_5 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_5)) else 0 end
-where class = 2
+spellppmRate_1 = case when spellppmRate_1 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_1)) else spellppmRate_1 end,
+spellppmRate_2 = case when spellppmRate_2 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_2)) else spellppmRate_2 end,
+spellppmRate_3 = case when spellppmRate_3 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_3)) else spellppmRate_3 end,
+spellppmRate_4 = case when spellppmRate_4 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_4)) else spellppmRate_4 end,
+spellppmRate_5 = case when spellppmRate_5 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_5)) else spellppmRate_5 end
 ;
 
--- Add these new items to item_template
+-- optionally, create an index on the variable_loot_proc table as  no further changes should be made from this point
+-- create index ix_lootproc on variable_loot_proc (entry)
+
+-- Create a subset table for weapons to minimise effort of the UPDATE 
+create table variable_loot_weapons as
+select * from variable_loot where class = 2;
+
+-- Push the proc changes to the weapons subset table
+update variable_loot_weapons a
+left outer join variable_loot_proc b
+on a.entry = b.entry 
+set
+a.spellid_1 = b.spellid_1,
+a.spellid_2 = b.spellid_2,
+a.spellid_3 = b.spellid_3,
+a.spellid_4 = b.spellid_4,
+a.spellid_5 = b.spellid_5,
+
+a.spelltrigger_1 = b.spelltrigger_1,
+a.spelltrigger_2 = b.spelltrigger_2,
+a.spelltrigger_3 = b.spelltrigger_3,
+a.spelltrigger_4 = b.spelltrigger_4,
+a.spelltrigger_5 = b.spelltrigger_5,
+
+a.spellppmrate_1 = b.spellppmrate_1,
+a.spellppmrate_2 = b.spellppmrate_2,
+a.spellppmrate_3 = b.spellppmrate_3,
+a.spellppmrate_4 = b.spellppmrate_4,
+a.spellppmrate_5 = b.spellppmrate_5,
+
+a.spellcooldown_1 = b.spellcooldown_1,
+a.spellcooldown_2 = b.spellcooldown_2,
+a.spellcooldown_3 = b.spellcooldown_3,
+a.spellcooldown_4 = b.spellcooldown_4,
+a.spellcooldown_5 = b.spellcooldown_5
+where b.entry is not null and a.class = 2
+;
+
+-- Insert all iterations of modified equipment to the item_template table 
 insert into item_template
-select * from variable_loot;
+select * from variable_loot where class !=2;
+
+insert into item_template
+select * from variable_loot_weapons;
+
 
 --Create backups of loot template tables
 create table creature_loot_backup as
