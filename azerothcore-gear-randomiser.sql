@@ -2,13 +2,13 @@
 -- This example works for TBC gear modified by azerothcore-tbc-scaled, as well as (nearly) all level 80 WOTLK gear
 
 -- Some useful queries to refresh the process. 
--- delete from item_template where entry in(select new_entry from variable_loot_ref);
--- drop table variable_loot;
--- drop table variable_loot_weapons;
--- drop table variable_loot_base;
--- drop table variable_loot_ref;
--- drop table variable_loot_proc;
--- drop table variable_loot_proc_calc;
+delete from item_template where entry in(select new_entry from variable_loot_ref);
+drop table variable_loot;
+drop table variable_loot_weapons;
+drop table variable_loot_base;
+drop table variable_loot_ref;
+drop table variable_loot_proc;
+drop table variable_loot_proc_calc;
 
 
 create table variable_loot_base as
@@ -24,18 +24,21 @@ and
 	and bonding = 1 -- BoP
 	and RequiredLevel = 70
 	) -- Level 70 rares and epics that BOP
-or itemlevel >199) -- WOTLK items
+or (itemlevel >199) -- WOTLK items
+)
 			
 and name not like '%gladiator%'
 and name not like '%high warlord%'
 and name not like '%grand marshal%'
 and name not like 'Chancellor''s%' -- excluding PVP gear and a bunch of TBC items not available to players
-and RequiredReputationFaction = 0 -- exclude rep items, doing a daily vendor check to see if a rep item has rolled well sounds horrendously unfun
+and RequiredReputationFaction = 0 -- exclude rep items, doing a daily vendor check to see if a rep item has rolled well sounds horrendous
 ;
 
+/*
 create table iterations as
 WITH RECURSIVE seq AS (SELECT 0 AS value UNION ALL SELECT value + 1 FROM seq LIMIT 50)
    SELECT * FROM seq;
+*/
 
 create table variable_loot as
 select 
@@ -181,8 +184,8 @@ spellppmRate_4 = case when spellppmRate_4 = 99 then ((RAND()*(4-1)+1)/(select po
 spellppmRate_5 = case when spellppmRate_5 = 99 then ((RAND()*(4-1)+1)/(select power from proc_spell where spell_id = spellid_5)) else spellppmRate_5 end
 ;
 
--- optionally, create an index on the variable_loot_proc table as  no further changes should be made from this point
--- create index ix_lootproc on variable_loot_proc (entry)
+-- create an index on the variable_loot_proc table as  no further changes should be made from this point
+create index ix_lootproc on variable_loot_proc (entry);
 
 -- Create a subset table for weapons to minimise effort of the UPDATE 
 create table variable_loot_weapons as
@@ -226,15 +229,20 @@ select * from variable_loot where class !=2;
 insert into item_template
 select * from variable_loot_weapons;
 
+create index ix_loottemp on variable_loot_ref (entry,new_entry);
 
+/*
 --Create backups of loot template tables
 create table creature_loot_backup as
 select * from creature_loot_template;
 create table reference_loot_backup as
 select * from reference_loot_template;
+*/
 
 --Schedule a SQL job to run a script prior to daily restart that
 --drops and refreshes creature_loot_template and reference_loot_template
+-- multiple iterations of the update query are required, probably due to RAND methodology
+-- This is not very efficient, but the whole process executes in under a minute
 SET GLOBAL event_scheduler = ON;
 delimiter |
 CREATE EVENT IF NOT EXISTS item_randomiser
@@ -249,17 +257,144 @@ truncate table acore_world.reference_loot_template;
 insert into acore_world.creature_loot_template select * from acore_world.creature_loot_backup;
 insert into acore_world.reference_loot_template select * from acore_world.reference_loot_backup;
 
-update acore_world.creature_loot_template a
-left outer join acore_world.variable_loot_ref b
-on a.item = b.entry 
-set a.item = (select b.new_entry ORDER BY RAND() LIMIT 1)
-where a.item in (select entry from acore_world.variable_loot_ref)
-;
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
 
-update reference_loot_template a
-left outer join variable_loot_ref b
-on a.item = b.entry 
-set a.item = (select b.new_entry ORDER BY RAND() LIMIT 1)
-where a.item in (select entry from variable_loot_ref)
-;
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.reference_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
+update acore_world.creature_loot_template a
+join acore_world.variable_loot_ref b
+on a.item = b.entry
+set a.item = b.new_entry
+where b.value = floor(RAND()*(50-1)+1)
+and a.item in (select entry from acore_world.variable_loot_ref);
+
 END |
